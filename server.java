@@ -20,7 +20,7 @@ public class server {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("✅ Client connected: " + clientSocket.getInetAddress());
 
-                handleClient(clientSocket);
+                new Thread(() -> handleClient(clientSocket)).start();
             }
 
         } catch (IOException e) {

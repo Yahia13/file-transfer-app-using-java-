@@ -3,45 +3,50 @@ import java.net.*;
 import java.util.Scanner;
 
 public class client {
-    private static final String SERVER_ADDRESS = "127.0.0.1";
+    private static final String SERVER_ADDRESS = "localhost";
     private static final int PORT = 5000;
 
     public static void main(String[] args) {
         try (
             Socket socket = new Socket(SERVER_ADDRESS, PORT);
-            Scanner scanner = new Scanner(System.in);
             DataInputStream dis = new DataInputStream(socket.getInputStream());
-            DataOutputStream dos = new DataOutputStream(socket.getOutputStream())
+            DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+            Scanner scanner = new Scanner(System.in)
         ) {
-            System.out.print("📄 Enter file name to download: ");
-            String fileName = scanner.nextLine();
+            System.out.println("📡 Connected to server.");
 
-            System.out.print("🎵 Enter file genre (e.g., image, video, doc): ");
-            String genre = scanner.nextLine();
+            while (true) {
+                System.out.print("Enter file name (or 'exit' to quit): ");
+                String fileName = scanner.nextLine().trim();
+                dos.writeUTF(fileName);
 
-            dos.writeUTF(fileName);
-            dos.writeUTF(genre); // Send genre info to server
+                if (fileName.equalsIgnoreCase("exit")) break;
 
-            String response = dis.readUTF();
-            if (response.equals("ERROR")) {
-                System.out.println("❌ File not found on server.");
-                return;
+                System.out.print("Enter file genre: ");
+                String genre = scanner.nextLine().trim();
+                dos.writeUTF(genre);
+
+                String status = dis.readUTF();
+                if (status.equals("NOT_FOUND")) {
+                    System.out.println("❌ File not found on server.");
+                } else {
+                    File receivedFile = new File("received_" + fileName);
+                    try (FileOutputStream fos = new FileOutputStream(receivedFile)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = dis.read(buffer)) != -1) {
+                            fos.write(buffer, 0, bytesRead);
+                            if (bytesRead < 4096) break; // simple end-of-file detection
+                        }
+                        System.out.println("✅ File received: " + receivedFile.getAbsolutePath());
+                    }
+                }
             }
 
-            FileOutputStream fos = new FileOutputStream("downloads/" + fileName);
-            byte[] buffer = new byte[4096];
-            int bytesRead;
+            System.out.println("👋 Disconnected from server.");
 
-            System.out.println("⬇️ Downloading...");
-
-            while ((bytesRead = dis.read(buffer)) > 0) {
-                fos.write(buffer, 0, bytesRead);
-                if (bytesRead < buffer.length) break;
-            }
-
-            fos.close();
-            System.out.println("✅ File downloaded to 'downloads/" + fileName + "'");
         } catch (IOException e) {
+            System.out.println("❌ Could not connect to server.");
             e.printStackTrace();
         }
     }
