@@ -6,7 +6,7 @@ import java.util.Date;
 
 public class server {
     private static final int PORT = 5000;
-
+    private static final String SHARED_DIRECTORY = "C:/Users/yahia/Downloads\r\n" ;
     // Replace with your actual DB info
     private static final String DB_URL = "jdbc:mysql://localhost:3306/file_transfer_db";
     private static final String DB_USER = "root";
@@ -34,22 +34,28 @@ public class server {
             DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())
         ) {
             while (true) {
-                // Read filename and genre from client
-                String fileName = dis.readUTF().trim();
-                if (fileName.equalsIgnoreCase("exit")) break; // Let client send "exit" to end session
+                String command = dis.readUTF();
+                if (command.equals("LIST")) {
+                    File dir = new File(SHARED_DIRECTORY);
+                    String[] files = dir.list();
+                    if (files != null) {
+                        for (String file : files) {
+                            dos.writeUTF(file);
+                        }
+                    }
+                    dos.writeUTF("END");
+                } else if (command.equals("GET")) {
+                    String fileName = dis.readUTF();
+                    File file = new File(SHARED_DIRECTORY, fileName);
+                    System.out.println("📁 Requested file: " + file.getName());
 
-                String genre = dis.readUTF().trim();
-                System.out.println("📁 Requested file: " + fileName + " | Genre: " + genre);
+                    if (!file.exists() || file.isDirectory()) {
+                        dos.writeUTF("NOT_FOUND");
+                        System.out.println("❌ File not found.");
+                        continue;
+                    }
 
-                File file = new File("files", fileName);
-                System.out.println("🔍 Looking for file at: " + file.getAbsolutePath());
-
-                if (!file.exists() || file.isDirectory()) {
-                    dos.writeUTF("NOT_FOUND");
-                    System.out.println("❌ File not found.");
-                } else {
                     dos.writeUTF("FOUND");
-
                     try (FileInputStream fis = new FileInputStream(file)) {
                         byte[] buffer = new byte[4096];
                         int bytesRead;
@@ -58,14 +64,13 @@ public class server {
                         }
                     }
 
-                    logTransferToDatabase(fileName, genre);
-                    System.out.println("✅ File sent and logged to MySQL DB.");
+                    logTransferToDatabase(file.getName(), "unknown");
+                    System.out.println("✅ File sent and logged.");
                 }
             }
 
         } catch (IOException e) {
-            System.out.println("❌ Client connection lost.");
-            e.printStackTrace();
+            System.out.println("❌ Client disconnected.");
         }
     }
 
